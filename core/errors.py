@@ -18,7 +18,7 @@ def not_found(resource: str, identifier: object) -> HTTPException:
 def invalid_request(message: str) -> HTTPException:
     """422 — la petición llegó bien formada pero no es válida a nivel de dominio."""
     return HTTPException(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         detail=message,
     )
 

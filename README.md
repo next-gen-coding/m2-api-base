@@ -49,7 +49,7 @@ rama de solución:
 
 | Clase | Rama de trabajo | Solución | Qué añade |
 |-------|-----------------|----------|-----------|
-| 1 · Generación | `main` | — | La base. Falta `GET /users/search`. |
+| 1 · Generación | `main` | `solucion-clase1` | La base. Falta `GET /users/search`. |
 | 2 · Testing | `clase2-testing` | `solucion-clase2` | `users/validation.py` sin tests → llévalo a >80%. |
 | 3 · Debugging | `clase3-debugging` | `solucion-clase3` | Recurso `reports/` con 3 bugs plantados. |
 | 4 · Review | `clase4-review` | `solucion-clase4` | PR de `GET /reports/export` con issues (verde). |

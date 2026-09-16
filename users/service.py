@@ -24,3 +24,10 @@ def create_user(data: UserCreate) -> User:
     if repository.find_by_email(str(data.email)) is not None:
         raise errors.already_exists("usuario", data.email)
     return repository.add(name=data.name, email=str(data.email))
+
+
+def search_by_email(email: str) -> User:
+    user = repository.find_by_email(email)
+    if user is None:
+        raise errors.not_found("usuario", email)
+    return user

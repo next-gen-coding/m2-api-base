@@ -54,3 +54,22 @@ def test_create_user_email_invalido_devuelve_422(client: TestClient) -> None:
     response = client.post("/users", json=payload)
 
     assert response.status_code == 422
+
+
+def test_search_user_por_email_existente_devuelve_200(client: TestClient) -> None:
+    response = client.get("/users/search", params={"email": "ada@example.com"})
+
+    assert response.status_code == 200
+    assert response.json()["id"] == 1
+
+
+def test_search_user_email_invalido_devuelve_422(client: TestClient) -> None:
+    response = client.get("/users/search", params={"email": "no-es-email"})
+
+    assert response.status_code == 422
+
+
+def test_search_user_email_inexistente_devuelve_404(client: TestClient) -> None:
+    response = client.get("/users/search", params={"email": "nadie@example.com"})
+
+    assert response.status_code == 404

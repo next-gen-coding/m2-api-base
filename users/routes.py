@@ -6,7 +6,8 @@ Patrón de referencia para nuevas rutas:
   - la función delega en `service.py` y no contiene lógica de negocio
   - los errores los levanta `service.py` con `core.errors`
 """
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Query, status
+from pydantic import EmailStr
 
 from users import service
 from users.schemas import User, UserCreate
@@ -17,6 +18,11 @@ router = APIRouter(prefix="/users", tags=["users"])
 @router.get("", response_model=list[User])
 def list_users() -> list[User]:
     return service.list_users()
+
+
+@router.get("/search", response_model=User)
+def search_user_by_email(email: EmailStr = Query(...)) -> User:
+    return service.search_by_email(str(email))
 
 
 @router.get("/{user_id}", response_model=User)

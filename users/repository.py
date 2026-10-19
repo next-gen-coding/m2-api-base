@@ -41,6 +41,7 @@ def list_all() -> list[User]:
 
 
 def find_by_email(email: str) -> User | None:
+    """Busca por email exacto sin distinguir mayúsculas. Devuelve `None` si no hay coincidencia."""
     target = email.lower()
     return next((u for u in _users.values() if u.email.lower() == target), None)
 

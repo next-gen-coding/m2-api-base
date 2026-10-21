@@ -19,6 +19,20 @@ def add(
     priority: TaskPriority,
     due_date: date | None,
 ) -> Task:
+    """Guarda una nueva tarea en memoria.
+
+    No valida nada: las reglas de negocio viven en `service.py`.
+
+    Args:
+        title: Título de la tarea.
+        description: Descripción opcional.
+        priority: Prioridad de la tarea.
+        due_date: Fecha límite opcional.
+
+    Returns:
+        La `Task` almacenada, con `id` autoincremental (desde 1) y `created_at`
+        en UTC.
+    """
     global _next_id
     task = Task(
         id=_next_id,
@@ -34,10 +48,24 @@ def add(
 
 
 def get(task_id: int) -> Task | None:
+    """Busca una tarea por identificador.
+
+    Args:
+        task_id: Identificador de la tarea.
+
+    Returns:
+        La `Task` encontrada, o `None` si no existe.
+    """
     return _tasks.get(task_id)
 
 
 def list_all() -> list[Task]:
+    """Lista todas las tareas almacenadas.
+
+    Returns:
+        Una lista nueva con las tareas en orden de creación; vacía si no hay
+        ninguna.
+    """
     return list(_tasks.values())
 
 

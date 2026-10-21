@@ -33,6 +33,63 @@ Endpoints actuales:
 | GET    | `/users`          | Lista de usuarios               |
 | GET    | `/users/{id}`     | Un usuario por id (404 si no existe) |
 | POST   | `/users`          | Crea un usuario (409 si el email ya existe) |
+| POST   | `/tasks`          | Crea una tarea (422 si el cuerpo es inválido o la fecha límite es pasada) |
+
+## Módulo `tasks`
+
+`POST /tasks` crea una tarea y devuelve **201** con la tarea creada (incluye `id` y
+`created_at`). Los datos se guardan en memoria: se pierden al reiniciar el servidor.
+
+Campos del cuerpo JSON:
+
+| Campo         | Tipo     | Obligatorio | Regla                                               |
+|---------------|----------|-------------|-----------------------------------------------------|
+| `title`       | string   | sí          | De 1 a 120 caracteres                               |
+| `description` | string   | no          | Hasta 500 caracteres                                |
+| `priority`    | string   | no          | `low`, `medium` o `high` (por defecto `medium`)     |
+| `due_date`    | `YYYY-MM-DD` | no      | No puede ser anterior a hoy (fecha UTC); hoy es válido |
+
+Ejemplo de payload válido:
+
+```json
+{
+  "title": "Write report",
+  "description": "Quarterly summary",
+  "priority": "high",
+  "due_date": "2030-12-31"
+}
+```
+
+Errores: **422** si falta `title` o está vacío, si `priority` no es uno de los valores
+permitidos, o si `due_date` es una fecha pasada.
+
+### Probarlo paso a paso
+
+1. Instala las dependencias (sección [Instalación](#instalación)).
+2. Arranca el servidor:
+
+   ```bash
+   uvicorn main:app --reload
+   ```
+
+3. Abre el Swagger UI en <http://127.0.0.1:8000/docs>.
+4. Despliega `POST /tasks`, pulsa **Try it out**, pega el payload de arriba y pulsa **Execute**.
+
+También desde la terminal:
+
+```bash
+curl -X POST http://127.0.0.1:8000/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Write report", "priority": "high", "due_date": "2030-12-31"}'
+```
+
+### Tests del módulo
+
+```bash
+pytest tests/test_tasks.py                          # solo los tests de tasks
+pytest                                              # toda la suite
+pytest --cov=tasks --cov-report=term-missing        # cobertura de tasks
+```
 
 ## Tests y calidad
 

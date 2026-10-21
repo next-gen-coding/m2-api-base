@@ -4,15 +4,16 @@ Las rutas no acceden al repositorio directamente: pasan por aquí. Esta capa es 
 única que conoce `repository.py` y la que decide cuándo algo es un error de
 dominio (usando `core.errors`).
 """
-from datetime import date
+from datetime import date, datetime, timezone
 
 from core import errors
 from tasks import repository
 from tasks.schemas import Task, TaskCreate
 
 
-def create_task(data: TaskCreate) -> Task:
-    if data.due_date is not None and data.due_date < date.today():
+def create_task(data: TaskCreate, current_date: date | None = None) -> Task:
+    reference_date = current_date or datetime.now(timezone.utc).date()
+    if data.due_date is not None and data.due_date < reference_date:
         raise errors.invalid_request("La fecha límite no puede estar en el pasado")
     return repository.add(
         title=data.title,

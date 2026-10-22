@@ -27,19 +27,54 @@ uvicorn main:app --reload          # http://127.0.0.1:8000  ·  Swagger en /docs
 
 Endpoints actuales:
 
-| Método | Ruta              | Descripción                     |
-|--------|-------------------|---------------------------------|
-| GET    | `/health`         | Estado del servicio             |
-| GET    | `/users`          | Lista de usuarios               |
-| GET    | `/users/{id}`     | Un usuario por id (404 si no existe) |
-| POST   | `/users`          | Crea un usuario (409 si el email ya existe) |
+| Método | Ruta              | Descripción                                  |
+|--------|--------------------|----------------------------------------------|
+| GET    | `/health`          | Estado del servicio                          |
+| GET    | `/users`           | Lista de usuarios                            |
+| GET    | `/users/{id}`      | Un usuario por id (404 si no existe)         |
+| POST   | `/users`           | Crea un usuario (409 si el email ya existe)  |
+| POST   | `/tasks`           | Crea una tarea asignada a un usuario (201)   |
+| GET    | `/tasks`           | Lista todas las tareas (200)                 |
+| GET    | `/tasks/{task_id}` | Detalle de una tarea (404 si no existe)      |
+| PATCH  | `/tasks/{task_id}` | Actualiza status y/o user_id (200)           |
+| DELETE | `/tasks/{task_id}` | Elimina una tarea (204 / 404)                |
+
+## Recurso Tasks
+
+Permite registrar tareas operativas asignadas a un usuario existente (user story USR-143).
+
+Campos: `title` (1-120 chars), `description` (opcional, max 500), `priority` (1-5),
+`user_id`, `due_date` (posterior a hoy). El `status` inicia en `todo` y se cambia vía PATCH
+(`todo`, `in_progress`, `done`).
+
+**Crear tarea:**
+
+```bash
+curl -X POST http://127.0.0.1:8000/tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Revisar reporte mensual",
+    "description": "Validar cifras del Q3",
+    "priority": 2,
+    "user_id": 1,
+    "due_date": "2026-11-01"
+  }'
+```
+
+**Actualizar status y/o reasignar:**
+
+```bash
+curl -X PATCH http://127.0.0.1:8000/tasks/1 \
+  -H "Content-Type: application/json" \
+  -d '{"status": "in_progress", "user_id": 2}'
+```
 
 ## Tests y calidad
 
 ```bash
-pytest                                       # correr la suite
-pytest --cov=. --cov-report=term-missing     # con cobertura
-ruff check .                                 # linter
+pytest                                                     # correr la suite
+pytest --cov=. --cov-branch --cov-report=term-missing      # cobertura de líneas + branch (meta >80%)
+ruff check .                                               # linter
 ```
 
 ## Ramas del módulo

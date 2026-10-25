@@ -42,3 +42,24 @@ ruff check .                       # linter
 ## Fuera de límites
 
 - `migrations/` y `legacy/` — no modificar.
+
+## Recurso tasks (reto M2)
+
+- Endpoints: `POST /tasks` (crear) y `GET /tasks/{task_id}` (consultar).
+- Mismo patrón que `users/`: `tasks/routes.py`, `tasks/service.py`,
+  `tasks/schemas.py`, `tasks/repository.py`. Montar el router en `main.py`.
+- Schemas: `TaskCreate` (title, priority, due_date) y `TaskOut`
+  (id, title, priority, due_date, status).
+- Validaciones de formato (largo del título, rango de prioridad) en `schemas.py` con Pydantic.
+- Reglas de negocio en `service.py`:
+  - fecha pasada → `invalid_request`
+  - tarea inexistente → `not_found`
+  - idempotencia con el header `Idempotency-Key`: misma clave → misma tarea, sin duplicar.
+- La fecha de "hoy" se recibe como dependencia en el service para simularla en tests;
+  no usar `date.today()` directo dentro de la lógica.
+- Repositorio: `dict` en memoria con `reset()` para los tests.
+- Docstrings estilo Google (Args, Returns, Raises, ejemplo) en las funciones públicas de `tasks/`.
+
+## Tests del recurso tasks
+- Nombres en español, un test por caso, aserciones específicas (valor exacto, no solo "no falla").
+- Cobertura: `pytest --cov=tasks --cov-branch --cov-report=term-missing` (meta >90%).

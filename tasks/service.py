@@ -9,6 +9,7 @@ no se llama a `date.today()` dentro de esta capa.
 """
 from datetime import date
 
+from core import errors
 from tasks import repository
 from tasks.schemas import TaskCreate, TaskOut
 
@@ -65,6 +66,7 @@ def get_task(task_id: int) -> TaskOut:
         >>> get_task(1).id
         1
     """
-    # TODO: no encontrado — si `repository.get(task_id)` es `None`, levantar
-    #       `errors.not_found("tarea", task_id)`.
-    return repository.get(task_id)
+    task = repository.get(task_id)
+    if task is None:
+        raise errors.not_found("tarea", task_id)
+    return task

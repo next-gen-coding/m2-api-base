@@ -99,8 +99,8 @@ pytest -q
 All checks passed!
 
 
-### Implementación imcremental - Prompt 
-Paso 1: implementa solo el happy path de @tasks/: repository.add, get y reset;
+### Implementación incremental - Prompt 
+implementa solo el happy path de @tasks/: repository.add, get y reset;
 service.create_task crea la tarea con status "pending" y service.get_task la devuelve.
 Sin validar fecha pasada, sin idempotencia y sin manejar "no encontrado" todavía.
 Corre `pytest -q`.
@@ -121,6 +121,25 @@ Prueba a mano: hice una llamada fuera de pytest con el ejemplo de la spec:
 Pendiente para los siguientes pasos:
 - Id inexistente: GET /tasks/999 hoy responde 500, no 404. get_task devuelve None y FastAPI no puede convertirlo en TaskOut. Se corrige al implementar el TODO de "no encontrado".
 - Reset entre tests: tests/conftest.py solo reinicia el repositorio de users. Cuando escribamos tests/test_tasks.py habrá que llamar también a tasks.repository.reset(), o los ids se arrastrarán de un test a otro.
+
+
+### Validaciones -> 422 (CA4 y CA2)
+
+Rechaza títulos de solo espacios en @tasks/schemas.py y, en @tasks/service.py,
+si due_date es anterior a today responde 422 con errors.invalid_request de
+@core/errors.py (hoy sí se acepta). Confirma qué código devuelve invalid_request.
+Corre `pytest -q`.
+
+GET /tasks/{task_id} ahora responde 404 cuando la tarea no existe. En service.get_task, si repository.get devuelve None, se levanta errors.not_found("tarea", task_id); quité ese TODO y agregué from core import errors. pytest -q pasa los 6 tests y ruff check . pasa limpio.
+
+Lo probé a mano fuera de pytest: GET /tasks/999 devuelve 404 con {"detail": "tarea no encontrado: 999"}, y una tarea recién creada sigue devolviendo 200.
+
+El mensaje tiene un error de concordancia: dice "tarea no encontrado". La plantilla de core/errors.py tiene fijo "no encontrado", que funciona para "usuario" pero no para "tarea". No lo cambié porque ese archivo lo usan todos los recursos. Hay dos formas de arreglarlo:
+- Usar otro nombre de recurso: pasar "recurso tarea" en vez de "tarea". Solo cambia tasks/service.py, pero el mensaje queda raro.
+- Ajustar core/errors.py: cambiar la plantilla a algo neutro como f"No se encontró {resource}: {identifier}". El mensaje de users cambia, pero su test ("no encontrado" in detail) se tendría que ajustar.
+
+Además, falta lo que pide CLAUDE.md para este endpoint: aún no hay tests de tasks (caso feliz y caso 404) en tests/test_tasks.py.
+
 
 ## 3. Tests y cobertura (antes: 0% en tasks → después: __%; mutantes)
 ## 4. Debugging y refactorización

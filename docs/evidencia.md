@@ -130,6 +130,7 @@ si due_date es anterior a today responde 422 con errors.invalid_request de
 @core/errors.py (hoy sí se acepta). Confirma qué código devuelve invalid_request.
 Corre `pytest -q`.
 
+### Respuesta
 GET /tasks/{task_id} ahora responde 404 cuando la tarea no existe. En service.get_task, si repository.get devuelve None, se levanta errors.not_found("tarea", task_id); quité ese TODO y agregué from core import errors. pytest -q pasa los 6 tests y ruff check . pasa limpio.
 
 Lo probé a mano fuera de pytest: GET /tasks/999 devuelve 404 con {"detail": "tarea no encontrado: 999"}, y una tarea recién creada sigue devolviendo 200.
@@ -139,6 +140,56 @@ El mensaje tiene un error de concordancia: dice "tarea no encontrado". La planti
 - Ajustar core/errors.py: cambiar la plantilla a algo neutro como f"No se encontró {resource}: {identifier}". El mensaje de users cambia, pero su test ("no encontrado" in detail) se tendría que ajustar.
 
 Además, falta lo que pide CLAUDE.md para este endpoint: aún no hay tests de tasks (caso feliz y caso 404) en tests/test_tasks.py.
+
+### Idempotencia (CA5)
+
+Si POST /tasks llega con un Idempotency-Key ya usado, devuelve la tarea
+original sin crear otra (usa find_by_idempotency_key y save_idempotency_key de
+@tasks/repository.py). Corre `pytest -q`.
+
+### Respuesta
+POST /tasks ya es idempotente: si llega con un Idempotency-Key ya usado, devuelve la tarea original y no crea otra. pytest -q pasa los 6 tests y ruff check . pasa limpio.
+
+Qué cambié:
+- repository.find_by_idempotency_key busca el id asociado a la clave y devuelve esa tarea, o None.
+- repository.save_idempotency_key guarda la relación clave → id.
+- service.create_task:
+  - Si viene una clave ya registrada, devuelve la tarea original sin crear nada.
+  - Si no, crea la tarea y, cuando hay clave, la registra.
+  - Sin clave, cada POST crea una tarea nueva.
+  - El TODO de fecha pasada sigue en su lugar.
+
+Prueba a mano (fuera de pytest):
+
+┌────────────────────────┬────────────────────────────────┐
+│        Petición        │           Resultado            │
+├────────────────────────┼────────────────────────────────┤
+│ POST con abc-123       │ 201, id 1                      │
+├────────────────────────┼────────────────────────────────┤
+│ Mismo POST con abc-123 │ 201, id 1 (no se duplicó)      │
+├────────────────────────┼────────────────────────────────┤
+│ POST sin clave         │ 201, id 2                      │
+├────────────────────────┼────────────────────────────────┤
+│ GET /tasks/3           │ 404 (no hay una tercera tarea) │
+└────────────────────────┴────────────────────────────────┘
+
+Decisiones que tomé y puedes cambiar:
+- Código del reenvío: responde 201, igual que la primera vez. La spec solo pide devolver la tarea original; si prefieres 200, hay que mover el código de estado de la ruta al service.
+- Cuerpo distinto con la misma clave: devuelve la tarea original sin comparar el cuerpo. CA5 habla de "mismo envío", y la otra opción sería responder 409 con already_exists.
+- Orden de las comprobaciones: la clave se revisa antes que la fecha. Un reenvío devolverá la original aunque su fecha ya haya pasado.
+
+Todavía no hay tests de tasks. El de idempotencia necesitará el reset de tasks.repository en conftest.py para que el registro de claves no pase de un test a otro.
+
+### Mi revisión
+
+### Las 3 decisiones de Claude
+
+| Decisión | Mi recomendación |
+| :--- | :--- |
+| El reenvío responde 201 | ✅ **Aceptarla.** Repetir la misma respuesta que la primera vez es lo normal en APIs idempotentes, y es más simple. |
+| Cuerpo distinto con la misma clave → devuelve la original | ✅ **Aceptarla**, pero agregarla como limitación conocida en el README. CA5 habla de “mismo envío”, así que cumple. |
+| La clave se revisa antes que la fecha | ✅ **Aceptarla**, es correcto. Si alguien reenvía una tarea que ya se creó, debe recibir la original aunque la fecha ya haya pasado. |
+
 
 
 ## 3. Tests y cobertura (antes: 0% en tasks → después: __%; mutantes)

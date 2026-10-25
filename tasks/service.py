@@ -38,16 +38,20 @@ def create_task(
         >>> create_task(data, today=date(2026, 10, 24)).status
         'pending'
     """
-    # TODO: idempotencia — si `idempotency_key` ya existe en el repositorio,
-    #       devolver la tarea original sin crear otra.
+    if idempotency_key is not None:
+        original = repository.find_by_idempotency_key(idempotency_key)
+        if original is not None:
+            return original
     # TODO: fecha pasada — si `data.due_date < today`, levantar
     #       `errors.invalid_request` con mensaje en español (hoy sí se acepta).
-    # TODO: si vino clave, registrarla con `repository.save_idempotency_key(...)`.
-    return repository.add(
+    task = repository.add(
         title=data.title,
         priority=data.priority,
         due_date=data.due_date,
     )
+    if idempotency_key is not None:
+        repository.save_idempotency_key(idempotency_key, task.id)
+    return task
 
 
 def get_task(task_id: int) -> TaskOut:

@@ -57,7 +57,10 @@ def find_by_idempotency_key(idempotency_key: str) -> TaskOut | None:
     Returns:
         La tarea asociada a la clave, o `None` si la clave no se ha usado.
     """
-    raise NotImplementedError
+    task_id = _task_id_by_idempotency_key.get(idempotency_key)
+    if task_id is None:
+        return None
+    return _tasks.get(task_id)
 
 
 def save_idempotency_key(idempotency_key: str, task_id: int) -> None:
@@ -67,7 +70,7 @@ def save_idempotency_key(idempotency_key: str, task_id: int) -> None:
         idempotency_key: Valor del header `Idempotency-Key`.
         task_id: Identificador de la tarea creada.
     """
-    raise NotImplementedError
+    _task_id_by_idempotency_key[idempotency_key] = task_id
 
 
 def reset() -> None:

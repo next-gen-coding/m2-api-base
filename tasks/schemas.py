@@ -7,7 +7,7 @@ aquí; las reglas de negocio (fecha pasada, idempotencia) viven en `service.py`.
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 TaskStatus = Literal["pending"]
 
@@ -25,7 +25,29 @@ class TaskCreate(BaseModel):
     priority: int = Field(ge=1, le=5)
     due_date: date
 
-    # TODO: rechazar títulos de solo espacios (validador de campo sobre `title`).
+    @field_validator("title")
+    @classmethod
+    def reject_blank_title(cls, title: str) -> str:
+        """Rechaza títulos formados solo por espacios.
+
+        Args:
+            title: Título recibido, ya validado en largo.
+
+        Returns:
+            El título sin modificar.
+
+        Raises:
+            ValueError: Si el título queda vacío al quitarle los espacios.
+
+        Example:
+            >>> TaskCreate(title="   ", priority=1, due_date=date(2026, 11, 15))
+            Traceback (most recent call last):
+            ...
+            pydantic_core._pydantic_core.ValidationError: ...
+        """
+        if not title.strip():
+            raise ValueError("el título no puede estar formado solo por espacios")
+        return title
 
 
 class TaskOut(BaseModel):

@@ -227,7 +227,247 @@ español (hoy sí se acepta). Respeta el orden actual: la clave de idempotencia 
 revisa primero. Dime qué código de estado devuelve invalid_request.
 Corre `pytest -q` y `ruff check .`.
 
+### Respuesta
 
+Resolví el TODO de fecha pasada en tasks/service.py. Si due_date es anterior a today, create_task levanta errors.invalid_request con este mensaje:
+
+▎ La fecha límite 2026-10-23 ya pasó; debe ser hoy o una fecha futura.
+
+La comparación es due_date < today, así que la fecha de hoy se acepta. Se comprueba después de la clave de idempotencia, en el orden que pediste.
+
+errors.invalid_request devuelve 422 (HTTP_422_UNPROCESSABLE_CONTENT), en core/errors.py:18-23.
+
+Resultados: pytest -q pasa los 6 tests y ruff check . pasa limpio.
+
+Lo probé a mano fuera de pytest, fijando "hoy" en 2026-10-24 con app.dependency_overrides[get_today]:
+
+┌────────────────────────────────────┬────────────┬──────────────────────────────────────┐
+│                Caso                │  due_date  │              Resultado               │
+├────────────────────────────────────┼────────────┼──────────────────────────────────────┤
+│ Ayer                               │ 2026-10-23 │ 422 con el mensaje de arriba         │
+├────────────────────────────────────┼────────────┼──────────────────────────────────────┤
+│ Hoy                                │ 2026-10-24 │ 201                                  │
+├────────────────────────────────────┼────────────┼──────────────────────────────────────┤
+│ Mañana                             │ 2026-10-25 │ 201                                  │
+├────────────────────────────────────┼────────────┼──────────────────────────────────────┤
+│ Reenvío con clave ya usada, cuerpo │ 2026-10-01 │ 201 con la tarea original, por el    │
+│  con fecha pasada                  │            │ orden clave → fecha                  │
+└────────────────────────────────────┴────────────┴──────────────────────────────────────┘
+
+Ya no quedan TODO de lógica en el service. Falta el de títulos de solo espacios en schemas.py, y faltan tests/test_tasks.py y el reset de tasks en conftest.py para CA8.
+
+### Aceptar cambios
+(.venv) PS D:\Next-Gen Coding 2026\Reto M2\m2-api-base> git commit -m "feat(tasks): 422 cuando la fecha limite ya paso"
+[reto-m2-tasks 5318717] feat(tasks): 422 cuando la fecha limite ya paso
+ 2 files changed, 42 insertions(+), 2 deletions(-)
+
+(.venv) PS D:\Next-Gen Coding 2026\Reto M2\m2-api-base> git commit -m "feat(tasks): 422 cuando la fecha limite ya paso"
+[reto-m2-tasks 5318717] feat(tasks): 422 cuando la fecha limite ya paso
+ 2 files changed, 42 insertions(+), 2 deletions(-)
+
+### Tests
+
+Añade los tests de tasks siguiendo el estilo de @tests/test_users.py y
+@docs/spec-task.md:
+- En @tests/conftest.py, reinicia también tasks.repository entre tests.
+- tests/test_tasks.py: un test por criterio CA1 a CA6, con TestClient,
+  estructura Arrange–Act–Assert y nombres descriptivos en español.
+  Para la fecha, sobrescribe get_today con una fecha fija (no uses la fecha real).
+- Incluye un test de integración: crear una tarea y luego consultarla con GET.
+Corre `pytest -q`.
+
+### Respuesta
+
+Los tests de tasks están escritos y pytest -q da 19 pasan, 1 falla. El que falla detecta un hueco real del código: un título de solo espacios ("   ") se acepta con 201 y debería dar 422. Es el TODO que quedó pendiente en tasks/schemas.py: hoy Field(min_length=3) cuenta los 3 espacios como caracteres válidos. No lo corregí porque pediste solo los tests. ruff check . pasa limpio.
+
+tests/conftest.py: el fixture automático ahora reinicia tasks.repository además del de users, antes y después de cada test.
+
+tests/test_tasks.py (14 casos):
+- Un fixture automático fija "hoy" en 2026-10-24 con app.dependency_overrides[get_today] y lo quita al terminar. Ningún test usa la fecha real.
+
+┌─────────────┬───────────────────────────────────────────────────────────────────────────────────┬─────────────────────┐
+│  Criterio   │                                       Test                                        │    Qué comprueba    │
+├─────────────┼───────────────────────────────────────────────────────────────────────────────────┼─────────────────────┤
+│ CA1         │ test_create_task_valida_devuelve_201_con_status_pending                           │ 201 y el cuerpo     │
+│             │                                                                                   │ completo exacto     │
+├─────────────┼───────────────────────────────────────────────────────────────────────────────────┼─────────────────────┤
+│             │ test_create_task_titulo_invalido_devuelve_422_y_no_crea_nada (4 variantes: vacío, │ 422, y que GET      │
+│ CA2         │  solo espacios, menos de 3, más de 100)                                           │ /tasks/1 da 404 (no │
+│             │                                                                                   │  se creó nada)      │
+├─────────────┼───────────────────────────────────────────────────────────────────────────────────┼─────────────────────┤
+│ CA3         │ test_create_task_prioridad_fuera_de_rango_devuelve_422 (0, 6, "alta")             │ 422 y que no se     │
+│             │                                                                                   │ creó nada           │
+├─────────────┼───────────────────────────────────────────────────────────────────────────────────┼─────────────────────┤
+│ CA4         │ test_create_task_fecha_pasada_devuelve_422_con_mensaje_en_espanol                 │ 422 con el mensaje  │
+│             │                                                                                   │ exacto              │
+├─────────────┼───────────────────────────────────────────────────────────────────────────────────┼─────────────────────┤
+│ CA4         │ test_create_task_fecha_de_hoy_se_acepta                                           │ 201 con la fecha de │
+│             │                                                                                   │  hoy                │
+├─────────────┼───────────────────────────────────────────────────────────────────────────────────┼─────────────────────┤
+│             │                                                                                   │ Cuerpo igual al     │
+│ CA5         │ test_create_task_misma_idempotency_key_devuelve_la_original_sin_duplicar          │ original, id 1, y   │
+│             │                                                                                   │ GET /tasks/2 da 404 │
+├─────────────┼───────────────────────────────────────────────────────────────────────────────────┼─────────────────────┤
+│             │ test_get_task_existente_devuelve_200 /                                            │ 200 con la tarea /  │
+│ CA6         │ test_get_task_inexistente_devuelve_404_con_mensaje_en_espanol                     │ 404 con el mensaje  │
+│             │                                                                                   │ exacto              │
+├─────────────┼───────────────────────────────────────────────────────────────────────────────────┼─────────────────────┤
+│             │                                                                                   │ El GET devuelve     │
+│ Integración │ test_crear_y_consultar_tarea_devuelve_los_mismos_datos                            │ exactamente lo que  │
+│             │                                                                                   │ devolvió el POST    │
+└─────────────┴───────────────────────────────────────────────────────────────────────────────────┴─────────────────────┘
+
+CA2, CA3 y CA6 tienen varios casos cada uno. Usé parametrize o tests separados para que siga habiendo un caso por test, como en test_users.py.
+
+El test del 404 compara el mensaje exacto "tarea no encontrado: 999". Si después cambias la plantilla de core/errors.py por la concordancia, habrá que actualizarlo.
+
+La spec en docs/ se llama spec-tasks.md, no spec-task.md.
+
+Si quieres, implemento el validador de solo espacios en schemas.py para que pasen los 20.
+
+### Verificamos con pytest -q
+
+(.venv) PS D:\Next-Gen Coding 2026\Reto M2\m2-api-base> pytest tests/test_tasks.py -k "titulo_invalido" -q
+.F..                                                                               [100%]
+======================================= FAILURES ========================================
+______ test_create_task_titulo_invalido_devuelve_422_y_no_crea_nada[solo_espacios] ______
+
+client = <starlette.testclient.TestClient object at 0x0000023243EA11D0>, title = '   '
+
+    @pytest.mark.parametrize(
+        "title",
+        ["", "   ", "ab", "a" * 101],
+        ids=["vacio", "solo_espacios", "menos_de_3", "mas_de_100"],
+    )
+    def test_create_task_titulo_invalido_devuelve_422_y_no_crea_nada(
+        client: TestClient, title: str
+    ) -> None:
+        payload = {**VALID_PAYLOAD, "title": title}
+    
+        response = client.post("/tasks", json=payload)
+    
+>       assert response.status_code == 422
+E       assert 201 == 422
+E        +  where 201 = <Response [201 Created]>.status_code
+
+tests\test_tasks.py:58: AssertionError
+================================ short test summary info ================================
+FAILED tests/test_tasks.py::test_create_task_titulo_invalido_devuelve_422_y_no_crea_nada[solo_espacios] - assert 201 == 422
+
+### Debugging con método de clase 3 - Prompt
+
+Este test falla:
+test_create_task_titulo_invalido_devuelve_422_y_no_crea_nada, variante "solo espacios".
+Qué esperaba: 422 con title "   " (CA2 de @docs/spec-tasks.md).
+Qué obtengo: 201, la tarea se crea.
+Archivos: @tasks/schemas.py @tests/test_tasks.py
+
+Dame 2-3 hipótesis de la causa, de más a menos probable, y cómo confirmar cada una.
+NO cambies código todavía.
+
+### Respuesta
+
+La causa más probable ya está confirmada: TaskCreate acepta "   " porque nada en el schema rechaza títulos de solo espacios. Para comprobarlo corrí solo inspecciones en Python, sin cambiar código.
+
+Hipótesis 1 (la más probable, confirmada): min_length=3 cuenta los espacios como caracteres.
+- Field(min_length=3, max_length=100) solo mide el largo de la cadena, y "   " mide exactamente 3. Pydantic no recorta espacios por defecto, y el validador de title es el TODO que quedó en tasks/schemas.py:28.
+- Cómo confirmarla: construir el modelo directamente, sin pasar por HTTP: TaskCreate(title="   ", priority=4, due_date="2026-11-15").
+- Resultado: se crea sin error, con title == '   ' y len == 3. Las únicas restricciones de title son [MinLen(3), MaxLen(100)]. El fallo está en el schema, no en la ruta ni en el service.
+
+Hipótesis 2 (descartada como causa, pero relacionada): el modelo no tiene configurado el recorte de espacios.
+- Con model_config = ConfigDict(str_strip_whitespace=True), Pydantic recortaría "   " a "" antes de aplicar min_length, y daría 422.
+- Cómo confirmarla: mirar TaskCreate.model_config.
+- Resultado: está vacío ({}), así que no hay recorte. Es el mismo hueco que la hipótesis 1, visto desde la configuración y no desde el campo.
+
+Hipótesis 3 (la menos probable, descartada): la ruta valida con otro modelo o el test no envía lo que parece.
+- Pudo ocurrir que POST /tasks usara otro schema, o que el parametrize mandara otro valor.
+- Cómo confirmarla: revisar qué modelo valida el cuerpo de la ruta y qué title se guardó.
+- Resultado: la ruta usa tasks.schemas.TaskCreate, y el título llega intacto a la hipótesis 1. Las variantes "vacío", "menos de 3" y "más de 100" sí dan 422, lo que también confirma que la ruta valida con TaskCreate.
+
+Cómo arreglarlo, cuando quieras:
+- Opción A (recomendada): un field_validator("title") que rechace la cadena si title.strip() queda vacío. Cumple CA2 sin cambiar el contenido de los títulos válidos.
+- Opción B: poner str_strip_whitespace=True en model_config. También funciona, pero modifica los títulos válidos: "  Revisar  " se guardaría como "Revisar". Además, " ab " pasaría a dar 422.
+
+### Confirmación de hipótesis # 1
+
+Confirmé la hipótesis número 1 leyendo la línea 24 title: str = Field(min_length=3, max_length=100). Aplica el fix mínimo en @tasks/schemas.py, nada más.
+No toques los tests ni otras partes del código. Corre `pytest -q` y `ruff check .`.
+
+### Respuesta
+
+ Read 1 file
+
+● Update(tasks\schemas.py)
+Added 23 lines, removed 1 line
+    priority: int = Field(ge=1, le=5)
+    due_date: date
+
+    # TODO: rechazar títulos de solo espacios (validador de campo sob
+re `title`).
+    @field_validator("title")
+    @classmethod
+    def reject_blank_title(cls, title: str) -> str:
+        """Rechaza títulos formados solo por espacios.
+
+        Args:
+            title: Título recibido, ya validado en largo.
+
+        Returns:
+            El título sin modificar.
+
+        Raises:
+            ValueError: Si el título queda vacío al quitarle los espa
+cios.
+
+        Example:
+            >>> TaskCreate(title="   ", priority=1, due_date=date(202
+6, 11, 15))
+            Traceback (most recent call last):
+            ...
+            pydantic_core._pydantic_core.ValidationError: ...
+        """
+        if not title.strip():
+            raise ValueError("el título no puede estar formado solo p
+or espacios")
+        return title
+
+
+class TaskOut(BaseModel):
+    """Tarea tal como la devuelve la API.
+
+
+● Update(tasks\schemas.py)
+Added 1 line, removed 1 line
+from datetime import date
+from typing import Literal
+
+from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+TaskStatus = Literal["pending"]
+
+
+  Ran 1 shell command
+
+Un título de solo espacios ahora da 422: agregué un validador en tasks/schemas.py y ya pasan los 20 tests. ruff check . pasa limpio. No toqué los tests ni ninguna otra parte del código.
+
+Qué cambié en tasks/schemas.py:
+- Agregué field_validator al import de Pydantic.
+- Agregué a TaskCreate un validador llamado reject_blank_title. Si title.strip() queda vacío, lanza ValueError("el título no puede estar formado solo por espacios"), y Pydantic lo convierte en una respuesta 422.
+- Quité el TODO, porque ya está resuelto.
+- El título válido se guarda tal cual llega, sin recortar espacios.
+- Field(min_length=3, max_length=100) en la línea 24 se queda igual. El validador se ejecuta después del chequeo de largo.
+
+El validador lleva un docstring estilo Google con ejemplo, que es más largo que el código. Lo puse porque CLAUDE.md lo pide para las funciones públicas de tasks/. Si quieres un cambio más corto, lo dejo en una línea.
+
+### Comprobación con pytest -q
+
+(.venv) PS D:\Next-Gen Coding 2026\Reto M2\m2-api-base> pytest tests/test_tasks.py -k "titulo_invalido" -q
+....                                                                                        [100%]
+
+### Aceptar cambio incremental
+
+git commit -m "test(tasks): tests CA1-CA6 y fix de titulo con solo espacios"
 
 ## 3. Tests y cobertura (antes: 0% en tasks → después: __%; mutantes)
 ## 4. Debugging y refactorización

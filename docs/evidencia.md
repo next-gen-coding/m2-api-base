@@ -122,6 +122,8 @@ Pendiente para los siguientes pasos:
 - Id inexistente: GET /tasks/999 hoy responde 500, no 404. get_task devuelve None y FastAPI no puede convertirlo en TaskOut. Se corrige al implementar el TODO de "no encontrado".
 - Reset entre tests: tests/conftest.py solo reinicia el repositorio de users. Cuando escribamos tests/test_tasks.py habrá que llamar también a tasks.repository.reset(), o los ids se arrastrarán de un test a otro.
 
+### Aceptar cambios 
+git add -A && git commit -m "feat(tasks): crear y consultar tarea, happy path"
 
 ### Validaciones -> 422 (CA4 y CA2)
 
@@ -131,6 +133,28 @@ si due_date es anterior a today responde 422 con errors.invalid_request de
 Corre `pytest -q`.
 
 ### Respuesta
+GET /tasks/{task_id} ahora responde 404 cuando la tarea no existe. En service.get_task, si repository.get devuelve None, se levanta errors.not_found("tarea", task_id); quité ese TODO y agregué from core import errors. pytest -q pasa los 6 tests y ruff check . pasa limpio.
+
+Lo probé a mano fuera de pytest: GET /tasks/999 devuelve 404 con {"detail": "tarea no encontrado: 999"}, y una tarea recién creada sigue devolviendo 200.
+
+El mensaje tiene un error de concordancia: dice "tarea no encontrado". La plantilla de core/errors.py tiene fijo "no encontrado", que funciona para "usuario" pero no para "tarea". No lo cambié porque ese archivo lo usan todos los recursos. Hay dos formas de arreglarlo:
+- Usar otro nombre de recurso: pasar "recurso tarea" en vez de "tarea". Solo cambia tasks/service.py, pero el mensaje queda raro.
+- Ajustar core/errors.py: cambiar la plantilla a algo neutro como f"No se encontró {resource}: {identifier}". El mensaje de users cambia, pero su test ("no encontrado" in detail) se tendría que ajustar.
+
+Además, falta lo que pide CLAUDE.md para este endpoint: aún no hay tests de tasks (caso feliz y caso 404) en tests/test_tasks.py.
+
+
+### Aceptar cambios
+
+git add -A && git commit -m "feat(tasks): validar titulo y fecha pasada"
+
+### No encontrado → 404 (CA6) - Prompt
+
+si la tarea no existe, GET /tasks/{task_id} responde 404 usando
+errors.not_found de @core/errors.py, levantado desde service.py. Corre `pytest -q`.
+
+### Respuesta
+
 GET /tasks/{task_id} ahora responde 404 cuando la tarea no existe. En service.get_task, si repository.get devuelve None, se levanta errors.not_found("tarea", task_id); quité ese TODO y agregué from core import errors. pytest -q pasa los 6 tests y ruff check . pasa limpio.
 
 Lo probé a mano fuera de pytest: GET /tasks/999 devuelve 404 con {"detail": "tarea no encontrado: 999"}, y una tarea recién creada sigue devolviendo 200.
@@ -189,6 +213,19 @@ Todavía no hay tests de tasks. El de idempotencia necesitará el reset de tasks
 | El reenvío responde 201 | ✅ **Aceptarla.** Repetir la misma respuesta que la primera vez es lo normal en APIs idempotentes, y es más simple. |
 | Cuerpo distinto con la misma clave → devuelve la original | ✅ **Aceptarla**, pero agregarla como limitación conocida en el README. CA5 habla de “mismo envío”, así que cumple. |
 | La clave se revisa antes que la fecha | ✅ **Aceptarla**, es correcto. Si alguien reenvía una tarea que ya se creó, debe recibir la original aunque la fecha ya haya pasado. |
+
+### Aceptar cambios
+
+git commit -m "feat(tasks): idempotencia con Idempotency-Key"
+
+
+### Terminar fecha pasada - prompt
+
+En @tasks/service.py resuelve el TODO de fecha pasada: si due_date es anterior a
+today, responde 422 con errors.invalid_request de @core/errors.py y un mensaje en
+español (hoy sí se acepta). Respeta el orden actual: la clave de idempotencia se
+revisa primero. Dime qué código de estado devuelve invalid_request.
+Corre `pytest -q` y `ruff check .`.
 
 
 

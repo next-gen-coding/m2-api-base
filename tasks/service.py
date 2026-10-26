@@ -42,8 +42,11 @@ def create_task(
         original = repository.find_by_idempotency_key(idempotency_key)
         if original is not None:
             return original
-    # TODO: fecha pasada — si `data.due_date < today`, levantar
-    #       `errors.invalid_request` con mensaje en español (hoy sí se acepta).
+    if data.due_date < today:
+        raise errors.invalid_request(
+            f"La fecha límite {data.due_date.isoformat()} ya pasó; "
+            "debe ser hoy o una fecha futura."
+        )
     task = repository.add(
         title=data.title,
         priority=data.priority,

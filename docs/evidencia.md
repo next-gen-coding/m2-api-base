@@ -751,11 +751,64 @@ No toques los tests. Corre `pytest -q` y `ruff check .`.
 
 ![img_6.png](img_6.png)
 
-#### Captura de verde
-
-
 
 ## 5. Documentación y reflexión
 
+### Docstrings
+Revisa los docstrings de @tasks/: ¿alguno describe algo que el código no hace, o
+tiene un ejemplo que no funcionaría (por ejemplo, get_task(1) sin que exista la
+tarea)? Corrige solo los docstrings, no la lógica.
 
+![img_7.png](img_7.png)
+![img_8.png](img_8.png)
 
+### README
+
+Agrega a @README.md una sección "Recurso tasks" para alguien nuevo en el equipo:
+qué hace, endpoints, tabla de campos y reglas, ejemplos de petición y respuesta
+(201, 422, 404 e idempotencia con Idempotency-Key), cómo correr los tests y la
+cobertura de tasks, y una subsección "Comportamientos conocidos" (la prioridad
+acepta "3" como texto; el título se guarda sin recortar).
+Basado en @docs/spec-tasks.md y @tasks/. No cambies código.
+
+![img_9.png](img_9.png)
+
+### CHANGELOG
+
+Crea CHANGELOG.md en formato "Keep a Changelog" con la versión 0.2.0 y la fecha de
+  hoy: Added (recurso tasks, endpoints, idempotencia), Fixed (bugs de título y
+  prioridad), Changed (refactor que hicimos). Usa git log --oneline main..HEAD
+  como fuente.
+
+![img_10.png](img_10.png)
+
+1. ¿Qué funcionó?
+Lo que mejor funcionó fue darle a la IA el contexto correcto antes de pedirle código. Debido a que no tengo experiencia como desarrollador, usé Claude.ai para escribir los criterios de aceptación en un archivo aparte y las reglas del proyecto en CLAUDE.md, y con eso la estructura que generó encajó con el resto del proyecto. 
+
+También funcionó avanzar en pasos pequeños y revisar cada uno antes de seguir.
+
+2. ¿Qué propuesta de la IA rechacé y por qué?
+
+Para corregir un error en el título, la IA propuso un cambio que además modificaba cómo se guardaban los títulos, algo que yo no había pedido ni estaba definido en la especificación. Lo rechacé y pedí solo la corrección mínima. La IA tiende a hacer más de lo que pides, por lo que mi papel es delimitar el alcance.
+
+3. ¿Qué me sorprendió?
+
+Que las pruebas encontraran errores que nadie había pensado. Cuando le di a la IA una lista de casos límite para probar, salieron dos comportamientos inesperados: la API aceptaba “true” como prioridad, y un título con espacios de relleno pasaba la validación aunque tuviera solo 2 letras reales. 
+
+También me sorprendió que tener 99% de cobertura no garantiza que las pruebas sirvan. Con las mutaciones  comprobé si las pruebas detectaban el error.
+
+4. ¿Qué salió mal?
+
+Al corregir dos errores al mismo tiempo mezclé las instrucciones: confirmé la causa de un error y pegué la corrección del otro. La IA lo detectó y me avisó en lugar de improvisar, pero me di cuenta de que debo trabajar un problema a la vez y empezar una conversación nueva para cada uno.
+
+5. ¿Qué mejoraría?
+
+Definir mejor la especificación desde el inicio. Dos dudas aparecieron tarde: si el título debe guardarse sin espacios sobrantes y si la prioridad puede llegar como texto (“3”). Si las hubiera definido antes, me habría ahorrado decisiones a mitad del trabajo. 
+
+También pediría desde el principio las pruebas de casos límite, no solo los casos normales.
+
+6. Como no desarrollador, ¿qué me permitió la IA y qué decisiones siguieron siendo mías?
+
+La IA escribió prácticamente todo el código y las pruebas; sin ella no habría podido construir esta funcionalidad. Pero las decisiones importantes fueron mías: qué debía hacer la API, qué contaba como error, qué propuestas aceptar o rechazar y cuándo algo estaba terminado. Mi rol fue parecido al de un revisor o auditor: no hago cada cálculo, pero defino los criterios, verifico la evidencia y decido si el resultado es confiable.
+
+La lección principal es que la IA acelera el trabajo, pero no sustituye el criterio. La calidad del resultado dependió de qué tan claro fui al pedir y de qué tan bien revisé lo que me entregó.

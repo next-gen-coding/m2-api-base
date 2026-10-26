@@ -28,10 +28,13 @@ def create_task(
         idempotency_key: Valor del header `Idempotency-Key`, si vino.
 
     Returns:
-        La tarea creada, o la tarea original si la clave ya existía.
+        La tarea creada, o la tarea original si la clave ya existía. Con una clave
+        ya usada no se compara el cuerpo ni se revalida la fecha: se devuelve la
+        original tal cual.
 
     Raises:
-        HTTPException: 422 (`errors.invalid_request`) si `due_date` es anterior a `today`.
+        HTTPException: 422 (`errors.invalid_request`) si `due_date` es anterior a
+            `today` y la clave no se había usado antes.
 
     Example:
         >>> data = TaskCreate(title="Revisar respaldo", priority=4, due_date=date(2026, 11, 15))
@@ -70,8 +73,10 @@ def get_task(task_id: int) -> TaskOut:
         HTTPException: 404 (`errors.not_found`) si la tarea no existe.
 
     Example:
-        >>> get_task(1).id
-        1
+        >>> data = TaskCreate(title="Revisar respaldo", priority=4, due_date=date(2026, 11, 15))
+        >>> created = create_task(data, today=date(2026, 10, 24))
+        >>> get_task(created.id) == created
+        True
     """
     task = repository.get(task_id)
     if task is None:

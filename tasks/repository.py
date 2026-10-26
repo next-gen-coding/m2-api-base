@@ -1,7 +1,8 @@
 """Almacén en memoria del recurso `tasks`.
 
 Sustituye a una base de datos real para que el proyecto sea ejecutable sin
-infraestructura. Solo `service.py` usa este módulo.
+infraestructura. En la app, solo `service.py` usa este módulo; los tests llaman
+a `reset()` entre casos.
 """
 from datetime import date
 
@@ -55,7 +56,8 @@ def find_by_idempotency_key(idempotency_key: str) -> TaskOut | None:
         idempotency_key: Valor del header `Idempotency-Key`.
 
     Returns:
-        La tarea asociada a la clave, o `None` si la clave no se ha usado.
+        La tarea asociada a la clave, o `None` si la clave no se ha usado o si
+        su tarea ya no está en el almacén.
     """
     task_id = _task_id_by_idempotency_key.get(idempotency_key)
     if task_id is None:

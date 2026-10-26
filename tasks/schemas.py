@@ -16,7 +16,8 @@ class TaskCreate(BaseModel):
     """Cuerpo de entrada para crear una tarea.
 
     Attributes:
-        title: Nombre de la tarea, de 3 a 100 caracteres.
+        title: Nombre de la tarea, sin ser solo espacios. Mínimo 3 caracteres
+            sin contar los espacios de los extremos; máximo 100 contándolos.
         priority: Urgencia, entero del 1 (baja) al 5 (alta).
         due_date: Fecha límite en formato `AAAA-MM-DD`.
     """
@@ -44,7 +45,8 @@ class TaskCreate(BaseModel):
                 quitarle los espacios de los extremos.
 
         Example:
-            >>> TaskCreate(title="  ab ", priority=1, due_date=date(2026, 11, 15))
+            >>> data = {"title": "  ab ", "priority": 1, "due_date": date(2026, 11, 15)}
+            >>> TaskCreate(**data)  # doctest: +ELLIPSIS
             Traceback (most recent call last):
             ...
             pydantic_core._pydantic_core.ValidationError: ...
@@ -73,7 +75,8 @@ class TaskCreate(BaseModel):
             ValueError: Si el valor es un booleano.
 
         Example:
-            >>> TaskCreate(title="Revisar", priority=True, due_date=date(2026, 11, 15))
+            >>> data = {"title": "Revisar", "priority": True, "due_date": date(2026, 11, 15)}
+            >>> TaskCreate(**data)  # doctest: +ELLIPSIS
             Traceback (most recent call last):
             ...
             pydantic_core._pydantic_core.ValidationError: ...

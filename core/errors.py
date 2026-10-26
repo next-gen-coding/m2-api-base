@@ -4,14 +4,32 @@ Todas las rutas deben levantar errores a través de estas funciones, para que lo
 códigos de estado y el formato de la respuesta sean consistentes en todo el
 proyecto. No usar `HTTPException` directamente en las rutas.
 """
+from typing import Literal
+
 from fastapi import HTTPException, status
 
+GrammaticalGender = Literal["masculine", "feminine"]
 
-def not_found(resource: str, identifier: object) -> HTTPException:
-    """404 — el recurso pedido no existe."""
+_FOUND_BY_GENDER: dict[GrammaticalGender, str] = {
+    "masculine": "encontrado",
+    "feminine": "encontrada",
+}
+
+
+def not_found(
+    resource: str,
+    identifier: object,
+    *,
+    gender: GrammaticalGender = "masculine",
+) -> HTTPException:
+    """404 — el recurso pedido no existe.
+
+    `gender` hace concordar el mensaje con el sustantivo del recurso
+    ("usuario no encontrado", "tarea no encontrada").
+    """
     return HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"{resource} no encontrado: {identifier}",
+        detail=f"{resource} no {_FOUND_BY_GENDER[gender]}: {identifier}",
     )
 
 

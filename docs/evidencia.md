@@ -698,6 +698,62 @@ Añade un test de regresión para el bug de priority: true y false deben dar 422
 ### Respuesta
 ![img_1.png](img_1.png)
 
+### Bug A (título " ab ")
+
+Bug: POST /tasks acepta {"title": "  ab ", ...} con 201; esperaba 422
+(CA2 de @docs/spec-tasks.md: menos de 3 caracteres → 422).
+Confirmé la causa: Field(min_length=3) cuenta los espacios de los extremos.
+
+Aplica el fix mínimo en @tasks/schemas.py: valida que el título tenga al menos
+3 caracteres SIN contar los espacios de los extremos, pero guarda el título
+tal como llegó ("  abc  " se sigue guardando igual). NO uses strip_whitespace.
+No toques los tests ni otras partes del código.
+
+### Respuesta
+
+![img_2.png](img_2.png)
+
+### Test regresión
+
+Añade un test de regresión: "  ab " debe dar 422. Debe fallar sin el fix y pasar
+con él. Escríbelo en tests/test_tasks.py, con nombre descriptivo en español y
+aserción específica. Corre `pytest -q` y `ruff check .`.
+
+### Respuesta
+
+![img_3.png](img_3.png)
+
+### Mutaciones manuales
+
+En tasks/service.py se cambió < por <= en data.due_date < today.
+
+Falla test_create_task_fecha_de_hoy_se_acepta 
+
+![img_4.png](img_4.png)
+
+### Refactorización
+
+Revisa @tasks/schemas.py @tasks/service.py @tasks/repository.py @core/errors.py y
+lista los code smells que veas, con la línea y por qué es un problema
+(por ejemplo: validadores redundantes, mensajes con concordancia incorrecta como
+"tarea no encontrado", nombres poco claros, números mágicos). No cambies nada.
+
+### Respuesta
+
+![img_5.png](img_5.png)
+
+## Confirmar code smell a refactorizar 
+
+Refactoriza Concordancia fija en masculino en un paso pequeño, sin cambiar el comportamiento.
+No toques los tests. Corre `pytest -q` y `ruff check .`.
+
+### Respuesta
+
+![img_6.png](img_6.png)
+
+#### Captura de verde
+
+
 
 ## 5. Documentación y reflexión
 

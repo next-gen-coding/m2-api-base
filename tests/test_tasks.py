@@ -167,6 +167,23 @@ def test_create_task_titulo_con_espacios_alrededor_se_guarda_sin_recortar(
     assert response.json()["title"] == "  abc  "
 
 
+def test_create_task_titulo_de_2_caracteres_rodeado_de_espacios_devuelve_422_y_no_crea_nada(
+    client: TestClient,
+) -> None:
+    # Regresión: min_length contaba los espacios de los extremos y "  ab " daba 201.
+    payload = {**VALID_PAYLOAD, "title": "  ab "}
+
+    response = client.post("/tasks", json=payload)
+
+    assert response.status_code == 422
+    error = response.json()["detail"][0]
+    assert error["loc"] == ["body", "title"]
+    assert error["msg"] == (
+        "Value error, el título debe tener al menos 3 caracteres sin espacios en los extremos"
+    )
+    assert client.get("/tasks/1").status_code == 404
+
+
 @pytest.mark.parametrize("priority", [1, 5], ids=["minima", "maxima"])
 def test_create_task_prioridad_en_el_limite_se_acepta(
     client: TestClient, priority: int

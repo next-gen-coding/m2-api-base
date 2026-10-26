@@ -21,32 +21,41 @@ class TaskCreate(BaseModel):
         due_date: Fecha límite en formato `AAAA-MM-DD`.
     """
 
-    title: str = Field(min_length=3, max_length=100)
+    title: str = Field(max_length=100)
     priority: int = Field(ge=1, le=5)
     due_date: date
 
     @field_validator("title")
     @classmethod
     def reject_blank_title(cls, title: str) -> str:
-        """Rechaza títulos formados solo por espacios.
+        """Rechaza títulos solo de espacios o con menos de 3 caracteres útiles.
+
+        El mínimo se cuenta sin los espacios de los extremos, pero el título se
+        guarda tal como llegó.
 
         Args:
-            title: Título recibido, ya validado en largo.
+            title: Título recibido, ya validado en largo máximo.
 
         Returns:
             El título sin modificar.
 
         Raises:
-            ValueError: Si el título queda vacío al quitarle los espacios.
+            ValueError: Si el título queda vacío o con menos de 3 caracteres al
+                quitarle los espacios de los extremos.
 
         Example:
-            >>> TaskCreate(title="   ", priority=1, due_date=date(2026, 11, 15))
+            >>> TaskCreate(title="  ab ", priority=1, due_date=date(2026, 11, 15))
             Traceback (most recent call last):
             ...
             pydantic_core._pydantic_core.ValidationError: ...
         """
-        if not title.strip():
+        stripped_title = title.strip()
+        if not stripped_title:
             raise ValueError("el título no puede estar formado solo por espacios")
+        if len(stripped_title) < 3:
+            raise ValueError(
+                "el título debe tener al menos 3 caracteres sin espacios en los extremos"
+            )
         return title
 
     @field_validator("priority", mode="before")

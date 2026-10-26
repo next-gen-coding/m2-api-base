@@ -562,10 +562,144 @@ Qué verifica: 404 con el mensaje exacto; get se llama con 999
 
 CLAUDE.md dice "un archivo por recurso: test_<recurso>.py", así que este segundo archivo de tasks no sigue esa regla al pie de la letra. Lo creé porque lo pediste explícitamente. Si prefieres respetar la regla, puedo mover estos tests a tests/test_tasks.py o anotar la excepción en CLAUDE.md.
 
+### Edge cases - Prompt
 
-gi
+Agrega a @tests/test_tasks.py los edge cases que falten según @docs/spec-tasks.md.
+Un test por caso, nombres en español, aserciones específicas.
+
+Edge cases a considerar:
+- Límites del título: 2, 3, 100 y 101 caracteres; espacios alrededor ("  abc  ")
+- Límites de prioridad: 1 y 5 se aceptan; decimal (3.5) y texto ("3")
+- Fecha: ayer (422), hoy (201), mañana (201); formato inválido ("15-11-2026");
+  fecha inexistente ("2026-02-30")
+- Idempotencia: dos claves distintas crean 2 tareas; dos POST sin clave crean 2 tareas
+- GET con id no numérico (/tasks/abc)
+
+Si algún caso revela un comportamiento dudoso, NO cambies el código: dime cuál
+y qué hace hoy. Corre `pytest -q`.
+
+### Respuesta
+
+Agregué 13 edge cases a tests/test_tasks.py. pytest -q pasa los 41 y ruff check . pasa limpio. No cambié código.
+
+Tres casos de tu lista ya estaban cubiertos: título de 2 y de 101 caracteres, y fecha de ayer. No los dupliqué.
+
+| Caso | Test | Resultado hoy |
+| :--- | :--- | :--- |
+| Título de 3 y de 100 caracteres | `..._titulo_en_el_limite_se_acepta` | 201 |
+| `"  abc  "` | `..._titulo_con_espacios_alrededor_se_guarda_sin_recortar` | 201, se guarda con los espacios ⚠️ |
+| Prioridad 1 y 5 | `..._prioridad_en_el_limite_se_acepta` | 201 |
+| Prioridad 3.5 | `..._prioridad_decimal_devuelve_422` | 422 (`int_from_float`) |
+| Prioridad `"3"` | `..._prioridad_como_texto_numerico_se_convierte_a_entero` | 201, se guarda como 3 ⚠️ |
+| Mañana | `..._fecha_de_manana_se_acepta` | 201 |
+| `"15-11-2026"` | `..._fecha_con_formato_invalido_devuelve_422` | 422 en `due_date`, no crea nada |
+| `"2026-02-30"` | `..._fecha_inexistente_devuelve_422` | 422 en `due_date`, no crea nada |
+| Dos claves distintas | `..._dos_claves_distintas_crean_dos_tareas` | ids 1 y 2 |
+| Dos POST sin clave | `..._dos_envios_sin_clave_crean_dos_tareas` | ids 1 y 2 |
+| GET `/tasks/abc` | `test_get_task_con_id_no_numerico_devuelve_422` | 422 en `task_id` (FastAPI valida el tipo antes de llegar al service) |
+
+Comportamientos dudosos. Los dos marcados con ⚠️ los dejé en los tests tal como funcionan hoy, con un comentario de "pendiente de decisión". Si decides cambiarlos, esos tests van a fallar, y es lo esperado.
+
+1. Prioridad "3" se acepta. Pydantic, en su modo flexible por defecto, convierte el texto "3" en el número 3. La spec dice "Entero", y CA3 pide 422 para algo "que no es número". Que "3" cuente como número es discutible.
+2. "  abc  " se guarda con sus espacios. El validador solo rechaza títulos formados únicamente por espacios; nunca recorta. La spec no dice si hay que recortar.
+3. Un título con relleno de espacios evade el mínimo de 3 caracteres (no estaba en tu lista). "  ab " responde 201: mide 5 contando los espacios, aunque solo tiene 2 caracteres reales. Esto sí contradice el espíritu de CA2. No le agregué test.
+4. Prioridad true se acepta como 1 (no estaba en tu lista). La misma conversión flexible de Pydantic lo convierte en entero. No le agregué test.
+
+Los cuatro tienen una causa común: Pydantic convierte tipos y no recorta espacios por defecto. Se resolverían juntos con strict=True en priority y recortando el título antes de medirlo. Eso cambia el comportamiento de la API, así que necesita tu decisión.
+
+### Medimos nuevamente, ahora con ramas
+
+(.venv) PS D:\Next-Gen Coding 2026\Reto M2\m2-api-base> pytest --cov=tasks --cov-branch --cov-report=term-missing
+.........................................                       [100%]
+tests coverage 
+### Reporte de Cobertura de Pruebas (Test Coverage)
+
+| Name | Stmts | Miss | Branch | BrPart | Cover | Missing |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| `tasks\__init__.py` | 0 | 0 | 0 | 0 | 100% | |
+| `tasks\repository.py` | 23 | 0 | 2 | 0 | 100% | |
+| `tasks\routes.py` | 14 | 1 | 0 | 0 | 93% | 23 |
+| `tasks\schemas.py` | 14 | 0 | 2 | 0 | 100% | |
+| `tasks\service.py` | 20 | 0 | 10 | 0 | 100% | |
+| **TOTAL** | **71** | **1** | **14** | **0** | **99%** | |
 
 
-## 4. Debugging y refactorización
+41 passed in 1.13s
+
+### Reproducción de error sin IA
+
+![img.png](img.png)
+
+
+### Debugging
+
+POST /tasks acepta un título que no cumple el mínimo de 3 caracteres:
+
+Petición: {"title": "  ab ", "priority": 3, "due_date": "2026-12-01"}
+Qué esperaba: 422 (CA2 de @docs/spec-tasks.md: menos de 3 caracteres → 422).
+Qué obtengo: 201, la tarea se crea. No hay excepción.
+Dato: "   " (solo espacios) sí da 422 y "ab" sí da 422.
+Archivos: @tasks/schemas.py @docs/spec-tasks.md
+
+Dame 2-3 hipótesis de la causa, de más a menos probable, y cómo confirmar cada una.
+NO cambies código todavía.
+
+### Respuesta
+
+Las tres hipótesis quedan confirmadas con inspecciones en Python, sin cambiar código. Juntas explican el bug: el largo se mide sin recortar los espacios, y el validador de title solo rechaza títulos vacíos.
+
+Hipótesis 1 (la más probable, confirmada): min_length=3 cuenta los espacios.
+- Field(min_length=3, max_length=100) en tasks/schemas.py:24 mide la cadena tal cual llega. "  ab " mide 5, así que pasa el mínimo aunque solo tenga 2 caracteres reales.
+- Cómo confirmarla: construir el modelo directamente y revisar sus restricciones y su configuración.
+- Resultado:
+  - len("  ab ") == 5.
+  - TaskCreate(title="  ab ", ...) se crea sin error y guarda '  ab ' intacto.
+  - Las únicas restricciones de title son [MinLen(3), MaxLen(100)], y model_config está vacío, así que no hay recorte de espacios.
+
+Hipótesis 2 (confirmada): el validador solo rechaza títulos vacíos tras recortar, no títulos cortos.
+- reject_blank_title comprueba not title.strip(). Eso detecta "   " (que queda en ""), pero "  ab " queda en "ab" y no está vacío, así que pasa. Esto explica tu dato de que "   " da 422 y "  ab " no.
+- Cómo confirmarla: comparar el tipo de error de cada caso.
+- Resultado:
+  - "   " da value_error ("el título no puede estar formado solo por espacios"), así que lo rechaza el validador, no la regla de largo.
+  - "ab" da string_too_short, así que ese sí lo rechaza min_length.
+  - Cada caso pasa por una vía distinta, y "  ab " no cae en ninguna.
+
+Hipótesis 3 (confirmada, contribuye): el validador corre después de la regla de largo.
+- reject_blank_title está en modo after, o sea que se ejecuta cuando min_length ya aprobó la cadena con espacios. Aunque el validador recortara y devolviera "ab", Pydantic no volvería a medir el largo.
+- Cómo confirmarla: revisar los validadores registrados en el modelo.
+- Resultado: solo hay reject_blank_title, aplicado a title y en modo after.
+
+Es el mismo hueco que señalé como "comportamiento dudoso 3" en la revisión de edge cases. El arreglo que aplicamos, StringConstraints(strip_whitespace=True, min_length=3, ...), lo resolvía, pero se deshizo al regresar al estado anterior. No hay test que lo cubra: el caso "  ab " se quitó en esa misma reversión.
+
+### Confirmación de hipótesis
+
+Confirmé la hipótesis número 1. Aplica el fix mínimo en @tasks/schemas.py, nada más:
+priority debe rechazar true/false. No cambies otros comportamientos
+(por ejemplo, "3" como texto se sigue aceptando por ahora).
+No toques los tests ni otras partes del código.
+
+### Respuesta
+
+priority ya rechaza true y false, pero el bug que reportaste ("  ab " aceptado con 201) sigue abierto. Confirmaste la hipótesis 1, que es la del título, y el fix que pediste es para la prioridad. Hice exactamente lo que pediste y no toqué title.
+
+Qué cambié en tasks/schemas.py:
+- Agregué a TaskCreate el validador reject_boolean_priority, que corre antes de que Pydantic convierta el valor a entero.
+- Si el valor es un booleano, lanza ValueError("la prioridad debe ser un número entero, no un booleano") y la API responde 422.
+- Cualquier otro valor pasa sin cambios, así que la conversión y el rango 1–5 se validan como antes.
+- No toqué los tests ni otras partes del código.
+
+### Test de regresión
+
+Añade un test de regresión para el bug de priority: true y false deben dar 422.
+  Debe fallar sin el fix y pasar con él. Escríbelo en tests/test_tasks.py, con nombre
+  descriptivo en español y aserción específica. Corre pytest -q y ruff check ..
+
+
+### Respuesta
+![img_1.png](img_1.png)
+
+
 ## 5. Documentación y reflexión
+
+
 

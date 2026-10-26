@@ -49,6 +49,30 @@ class TaskCreate(BaseModel):
             raise ValueError("el título no puede estar formado solo por espacios")
         return title
 
+    @field_validator("priority", mode="before")
+    @classmethod
+    def reject_boolean_priority(cls, priority: object) -> object:
+        """Rechaza `true`/`false` como prioridad; el texto numérico ("3") sigue valiendo.
+
+        Args:
+            priority: Valor crudo recibido, antes de convertirlo a entero.
+
+        Returns:
+            El valor sin modificar, para que Pydantic lo convierta y valide el rango.
+
+        Raises:
+            ValueError: Si el valor es un booleano.
+
+        Example:
+            >>> TaskCreate(title="Revisar", priority=True, due_date=date(2026, 11, 15))
+            Traceback (most recent call last):
+            ...
+            pydantic_core._pydantic_core.ValidationError: ...
+        """
+        if isinstance(priority, bool):
+            raise ValueError("la prioridad debe ser un número entero, no un booleano")
+        return priority
+
 
 class TaskOut(BaseModel):
     """Tarea tal como la devuelve la API.

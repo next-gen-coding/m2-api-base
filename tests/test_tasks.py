@@ -136,3 +136,139 @@ def test_crear_y_consultar_tarea_devuelve_los_mismos_datos(client: TestClient) -
 
     assert response.status_code == 200
     assert response.json() == created
+
+
+# --- Edge cases ---------------------------------------------------------------
+# Los límites inferiores/superiores inválidos (título de 2 y 101 caracteres,
+# fecha de ayer) ya están cubiertos arriba; aquí van los que faltaban.
+
+
+@pytest.mark.parametrize("length", [3, 100], ids=["3_caracteres", "100_caracteres"])
+def test_create_task_titulo_en_el_limite_se_acepta(
+    client: TestClient, length: int
+) -> None:
+    payload = {**VALID_PAYLOAD, "title": "a" * length}
+
+    response = client.post("/tasks", json=payload)
+
+    assert response.status_code == 201
+    assert response.json()["title"] == "a" * length
+
+
+def test_create_task_titulo_con_espacios_alrededor_se_guarda_sin_recortar(
+    client: TestClient,
+) -> None:
+    # Comportamiento actual (pendiente de decisión): no se recortan los espacios.
+    payload = {**VALID_PAYLOAD, "title": "  abc  "}
+
+    response = client.post("/tasks", json=payload)
+
+    assert response.status_code == 201
+    assert response.json()["title"] == "  abc  "
+
+
+@pytest.mark.parametrize("priority", [1, 5], ids=["minima", "maxima"])
+def test_create_task_prioridad_en_el_limite_se_acepta(
+    client: TestClient, priority: int
+) -> None:
+    payload = {**VALID_PAYLOAD, "priority": priority}
+
+    response = client.post("/tasks", json=payload)
+
+    assert response.status_code == 201
+    assert response.json()["priority"] == priority
+
+
+def test_create_task_prioridad_decimal_devuelve_422(client: TestClient) -> None:
+    payload = {**VALID_PAYLOAD, "priority": 3.5}
+
+    response = client.post("/tasks", json=payload)
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["type"] == "int_from_float"
+
+
+def test_create_task_prioridad_como_texto_numerico_se_convierte_a_entero(
+    client: TestClient,
+) -> None:
+    # Comportamiento actual (pendiente de decisión): Pydantic convierte "3" en 3.
+    payload = {**VALID_PAYLOAD, "priority": "3"}
+
+    response = client.post("/tasks", json=payload)
+
+    assert response.status_code == 201
+    assert response.json()["priority"] == 3
+
+
+@pytest.mark.parametrize("priority", [True, False], ids=["true", "false"])
+def test_create_task_prioridad_booleana_devuelve_422_y_no_crea_nada(
+    client: TestClient, priority: bool
+) -> None:
+    # Regresión: antes Pydantic convertía true → 1 y la tarea se creaba con 201.
+    payload = {**VALID_PAYLOAD, "priority": priority}
+
+    response = client.post("/tasks", json=payload)
+
+    assert response.status_code == 422
+    error = response.json()["detail"][0]
+    assert error["loc"] == ["body", "priority"]
+    assert error["msg"] == (
+        "Value error, la prioridad debe ser un número entero, no un booleano"
+    )
+    assert client.get("/tasks/1").status_code == 404
+
+
+def test_create_task_fecha_de_manana_se_acepta(client: TestClient) -> None:
+    payload = {**VALID_PAYLOAD, "due_date": "2026-10-25"}
+
+    response = client.post("/tasks", json=payload)
+
+    assert response.status_code == 201
+    assert response.json()["due_date"] == "2026-10-25"
+
+
+def test_create_task_fecha_con_formato_invalido_devuelve_422(client: TestClient) -> None:
+    payload = {**VALID_PAYLOAD, "due_date": "15-11-2026"}
+
+    response = client.post("/tasks", json=payload)
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["body", "due_date"]
+    assert client.get("/tasks/1").status_code == 404
+
+
+def test_create_task_fecha_inexistente_devuelve_422(client: TestClient) -> None:
+    payload = {**VALID_PAYLOAD, "due_date": "2026-02-30"}
+
+    response = client.post("/tasks", json=payload)
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["body", "due_date"]
+    assert client.get("/tasks/1").status_code == 404
+
+
+def test_create_task_dos_claves_distintas_crean_dos_tareas(client: TestClient) -> None:
+    first = client.post("/tasks", json=VALID_PAYLOAD, headers={"Idempotency-Key": "a"})
+
+    second = client.post("/tasks", json=VALID_PAYLOAD, headers={"Idempotency-Key": "b"})
+
+    assert first.json()["id"] == 1
+    assert second.status_code == 201
+    assert second.json()["id"] == 2
+
+
+def test_create_task_dos_envios_sin_clave_crean_dos_tareas(client: TestClient) -> None:
+    first = client.post("/tasks", json=VALID_PAYLOAD)
+
+    second = client.post("/tasks", json=VALID_PAYLOAD)
+
+    assert first.json()["id"] == 1
+    assert second.status_code == 201
+    assert second.json()["id"] == 2
+
+
+def test_get_task_con_id_no_numerico_devuelve_422(client: TestClient) -> None:
+    response = client.get("/tasks/abc")
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["path", "task_id"]

@@ -467,9 +467,105 @@ El validador lleva un docstring estilo Google con ejemplo, que es más largo que
 
 ### Aceptar cambio incremental
 
-git commit -m "test(tasks): tests CA1-CA6 y fix de titulo con solo espacios"
+(.venv) PS D:\Next-Gen Coding 2026\Reto M2\m2-api-base> git add -A                                 
+warning: in the working copy of 'docs/evidencia.md', CRLF will be replaced by LF the next time Git touches it
+(.venv) PS D:\Next-Gen Coding 2026\Reto M2\m2-api-base> git commit -m "test(tasks): tests CA1-CA6 y fix de titulo con solo espacios"                                                                  
+[reto-m2-tasks 84c04c4] test(tasks): tests CA1-CA6 y fix de titulo con solo espacios
+ 4 files changed, 405 insertions(+), 2 deletions(-)
+ create mode 100644 tests/test_tasks.py
+
+### Verificamos cobertura
+
+(.venv) PS D:\Next-Gen Coding 2026\Reto M2\m2-api-base> pytest --cov=tasks --cov-branch --cov-report=term-missing                                                                                     
+....................                                                                        [100%]
+
+### Tests coverage 
+
+| Name | Stmts | Miss | Branch | BrPart | Cover | Missing |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| `tasks\__init__.py` | 0 | 0 | 0 | 0 | 100% | |
+| `tasks\repository.py` | 23 | 0 | 2 | 0 | 100% | |
+| `tasks\routes.py` | 14 | 1 | 0 | 0 | 93% | 23 |
+| `tasks\schemas.py` | 14 | 0 | 2 | 0 | 100% | |
+| `tasks\service.py` | 20 | 0 | 10 | 0 | 100% | |
+| **TOTAL** | **71** | **1** | **14** | **0** | **99%** | |
+
+20 passed in 0.95s
+
+### Linter, sumario de commits incrementales y diff completo
+
+(.venv) PS D:\Next-Gen Coding 2026\Reto M2\m2-api-base> ruff check
+All checks passed!
+(.venv) PS D:\Next-Gen Coding 2026\Reto M2\m2-api-base> git log --oneline main..HEAD
+84c04c4 (HEAD -> reto-m2-tasks) test(tasks): tests CA1-CA6 y fix de titulo con solo espacios
+5318717 feat(tasks): 422 cuando la fecha limite ya paso
+68230ae feat(tasks): idempotencia con Idempotency-Key
+ad15a1c feat(tasks): 404 cuando la tarea no existe
+bf90a03 feat(tasks): esqueleto, spec y convenciones
+1e52cb5 (origin/clase2-testing, clase2-testing) feat(users): agrega users/validation.py sin tests (base Clase 2)
+(.venv) PS D:\Next-Gen Coding 2026\Reto M2\m2-api-base> git diff main
+diff --git a/.idea/.gitignore b/.idea/.gitignore
+new file mode 100644
+index 0000000..b58b603
+--- /dev/null
++++ b/.idea/.gitignore
+@@ -0,0 +1,5 @@
++# Default ignored files
++/shelf/
+:
 
 ## 3. Tests y cobertura (antes: 0% en tasks → después: __%; mutantes)
+
+### Tests unitarios del service, con mocks
+
+Crea tests/test_tasks_service.py con tests UNITARIOS de @tasks/service.py,
+sin TestClient. Estructura Arrange–Act–Assert marcada con comentarios.
+- Pasa `today` directamente como una fecha fija.
+- Usa monkeypatch o unittest.mock para sustituir tasks.repository, y verifica
+  con qué datos se llamó (ej. que con una clave repetida NO se llama a add).
+Un test por caso, nombres en español, aserciones específicas (valor exacto,
+`pytest.raises` para errores). Corre `pytest -q`.
+
+### Respuesta
+
+Creé tests/test_tasks_service.py con 8 tests unitarios del service. pytest -q pasa los 28 (20 de antes + 8 nuevos) y ruff check . pasa limpio.
+
+Cómo están armados:
+- Un fixture sustituye tasks.service.repository con monkeypatch. El mock se crea con create_autospec(repository, spec_set=True), así que si el service llama a una función que no existe o con argumentos que no encajan, el test falla.
+- today se pasa directo como date(2026, 10, 24). No se usa TestClient ni get_today.
+- Cada test marca # Arrange, # Act y # Assert. En los de error, pytest.raises va en Act y el código y el mensaje se comprueban en Assert.
+
+Test: ..._sin_clave_llama_a_add_con_los_datos_y_devuelve_la_tarea
+Qué verifica: add recibe exactamente título, prioridad y fecha;
+find_by_idempotency_key y save_idempotency_key no se llaman
+────────────────────────────────────────
+Test: ..._con_clave_nueva_crea_y_registra_la_clave
+Qué verifica: Busca con "abc-123", crea la tarea y guarda la clave con el id 7
+────────────────────────────────────────
+Test: ..._con_clave_repetida_devuelve_la_original_y_no_llama_a_add
+Qué verifica: Devuelve el mismo objeto original; add y save no se llaman
+────────────────────────────────────────
+Test: ..._fecha_pasada_levanta_422_y_no_llama_a_add
+Qué verifica: 422 con el mensaje exacto; add no se llama
+────────────────────────────────────────
+Test: ..._fecha_de_hoy_se_acepta_y_llama_a_add
+Qué verifica: add se llama con due_date=TODAY
+────────────────────────────────────────
+Test: ..._clave_repetida_con_fecha_pasada_devuelve_la_original_sin_validar
+Qué verifica: Fija el orden clave → fecha: no hay 422 y add no se llama
+────────────────────────────────────────
+Test: test_get_task_existente_devuelve_la_tarea_del_repositorio
+Qué verifica: Devuelve lo que da get(5)
+────────────────────────────────────────
+Test: test_get_task_inexistente_levanta_404_con_mensaje_en_espanol
+Qué verifica: 404 con el mensaje exacto; get se llama con 999
+
+CLAUDE.md dice "un archivo por recurso: test_<recurso>.py", así que este segundo archivo de tasks no sigue esa regla al pie de la letra. Lo creé porque lo pediste explícitamente. Si prefieres respetar la regla, puedo mover estos tests a tests/test_tasks.py o anotar la excepción en CLAUDE.md.
+
+
+gi
+
+
 ## 4. Debugging y refactorización
 ## 5. Documentación y reflexión
 
